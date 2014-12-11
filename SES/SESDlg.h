@@ -20,15 +20,13 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
-	cv::Mat m_mat1, m_mat_process, m_mat_display;
+	cv::Mat m_mat1, m_mat_process, m_mat_gray;
 	cv::Mat m_mat_ref;
 	cv::VideoCapture m_cam;
 	void DrawMatToHDC(cv::Mat img, UINT ID);
 	void DrawPicToHDC(IplImage *img, UINT ID);
 
-	bool m_flipH;
-	int  m_videoInt;
-	bool m_videoHalt;
+	
 // 实现
 protected:
 	HICON m_hIcon;
@@ -55,4 +53,5 @@ public:
 	afx_msg void OnBnClickedButtonFps25();
 	afx_msg void OnBnClickedButtonFps50();
 	afx_msg void OnBnClickedButtonFps100();
+	afx_msg void OnBnClickedButtonTrack();
 };

@@ -6,12 +6,24 @@
 #include "SES.h"
 #include "SESDlg.h"
 #include "afxdialogex.h"
-
+#include "BlockMatchDirSub.h"
+#include "PTTrackLIB.h"
+#include "Timer.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+using namespace cv;
+CBlockMatchDirSub bmds;
+CPlaceTokenMatch tracker;
+CTimeCount tt;
 
-
+bool m_flipH= FALSE;
+int  m_videoInt= 40;
+bool m_videoHalt= FALSE;
+bool m_DoMatch= FALSE;
+bool m_DoTrack= FALSE;
+CvPoint2D32f m_pnt= cvPoint2D32f(-1.0f,-1.0f);
+bool m_Flag1= FALSE;
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
 class CAboutDlg : public CDialogEx
@@ -52,9 +64,6 @@ CSESDlg::CSESDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CSESDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-	m_flipH= FALSE;
-	m_videoInt= 40; // timer 间隔
-	m_videoHalt= FALSE;
 }
 
 void CSESDlg::DoDataExchange(CDataExchange* pDX)
@@ -81,6 +90,7 @@ BEGIN_MESSAGE_MAP(CSESDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_FPS25, &CSESDlg::OnBnClickedButtonFps25)
 	ON_BN_CLICKED(IDC_BUTTON_FPS50, &CSESDlg::OnBnClickedButtonFps50)
 	ON_BN_CLICKED(IDC_BUTTON_FPS100, &CSESDlg::OnBnClickedButtonFps100)
+	ON_BN_CLICKED(IDC_BUTTON_TRACK, &CSESDlg::OnBnClickedButtonTrack)
 END_MESSAGE_MAP()
 
 
@@ -205,12 +215,39 @@ void CSESDlg::OnTimer(UINT_PTR nIDEvent)
 	m_cam>>m_mat1;
 	m_mat_process= m_mat1.clone();
 	// 添加视频处理代码
+	// 实时预处理并输出，左右翻转
 	if (m_flipH)
 	{
 		cv::flip(m_mat_process,m_mat_process,1);
 	}
 	m_mat1.release();
 	m_mat1= m_mat_process.clone();
+	// 灰度图像处理，只输出坐标
+//	m_mat_gray.create(m_mat_process.rows,m_mat_process.cols,CV_8UC1);
+	if (m_mat_process.channels()==3)
+	{
+		cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
+	}
+	else
+	{
+		m_mat_gray= m_mat_process.clone();
+	}
+	IplImage *im= &IplImage(m_mat_gray);
+	if (m_DoTrack)
+	{		
+		tt.Start();
+		tracker.TrackOneImage((uchar*)(m_mat_gray.data),  m_pnt);
+		drawCross(&IplImage(m_mat1),m_pnt);
+		tt.End();
+		char chEdit[8];
+		sprintf(chEdit,"%4d",(int)(m_pnt.x+0.5));
+		SetDlgItemText(IDC_EDIT_TARGET_X,chEdit);
+		sprintf(chEdit,"%4d",(int)(m_pnt.y+0.5));
+		SetDlgItemText(IDC_EDIT_TARGET_Y,chEdit);
+		sprintf(chEdit,"%7.1f",tt.GetUseTime());
+		SetDlgItemText(IDC_EDIT_USED_TIME,chEdit);
+	}
+	// 显示
 	DrawMatToHDC(m_mat1, IDC_Showimg1);
 	//m_frame=cvQueryFrame(m_capture);
 	//DrawPicToHDC(m_frame,IDC_Showimg1);
@@ -235,14 +272,15 @@ void CSESDlg::OnBnClickedButtonOpencarema()
 		// 显示图像参数
 		m_cam>>m_mat1;
 		char chEdit[10];
-		_itoa(m_mat1.cols,chEdit,10);
+		_itoa_s(m_mat1.cols,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realw,chEdit);
-		_itoa(m_mat1.rows,chEdit,10);
+		_itoa_s(m_mat1.rows,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realh,chEdit);
 		// 刷新显示区
 		Invalidate(TRUE);  
 		// 设置定时器
 		SetTimer(1, m_videoInt, NULL);
+		SetDlgItemText(IDC_STATIC_FPS,"25fsp");
 	}
 }
 
@@ -282,10 +320,11 @@ void CSESDlg::OnBnClickedButtonOpenreal()
 	DrawMatToHDC( m_mat1, IDC_Showimg1 );            // 调用显示图片函数 
 	// 显示图像参数
 	char chEdit[10];
-	_itoa(m_mat1.cols,chEdit,10);
+	_itoa_s(m_mat1.cols,chEdit,10);
 	SetDlgItemText(IDC_EDIT_Realw,chEdit);
-	_itoa(m_mat1.rows,chEdit,10);
+	_itoa_s(m_mat1.rows,chEdit,10);
 	SetDlgItemText(IDC_EDIT_Realh,chEdit);
+	
 }
 
 
@@ -311,9 +350,9 @@ void CSESDlg::OnBnClickedButtonOpenref()
 	DrawMatToHDC( m_mat_ref, IDC_ShowImg2 );            // 调用显示图片函数 
 	// 显示图像参数
 	char chEdit[10];
-	_itoa(m_mat_ref.cols,chEdit,10);
+	_itoa_s(m_mat_ref.cols,chEdit,10);
 	SetDlgItemText(IDC_EDIT_Refw,chEdit);
-	_itoa(m_mat_ref.rows,chEdit,10);
+	_itoa_s(m_mat_ref.rows,chEdit,10);
 	SetDlgItemText(IDC_EDIT_Refh,chEdit);
 }
 
@@ -345,14 +384,15 @@ void CSESDlg::OnBnClickedButtonOpenavi()
 		// 显示图像参数
 		m_cam>>m_mat1;
 		char chEdit[10];
-		_itoa(m_mat1.cols,chEdit,10);
+		_itoa_s(m_mat1.cols,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realw,chEdit);
-		_itoa(m_mat1.rows,chEdit,10);
+		_itoa_s(m_mat1.rows,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realh,chEdit);
 		// 刷新显示区
 		Invalidate(TRUE);  
 		// 设置定时器
 		SetTimer(1, m_videoInt, NULL);
+		SetDlgItemText(IDC_STATIC_FPS,"25fsp");
 	}
 }
 
@@ -414,6 +454,7 @@ void CSESDlg::OnBnClickedButtonFps6()
 	// TODO: 在此添加控件通知处理程序代码
 	m_videoInt= 160;    // ms
 	SetTimer(1, m_videoInt, NULL);
+	SetDlgItemText(IDC_STATIC_FPS," 6fsp");
 }
 
 
@@ -422,6 +463,7 @@ void CSESDlg::OnBnClickedButtonFps12()
 	// TODO: 在此添加控件通知处理程序代码
 	m_videoInt= 80;    // ms
 	SetTimer(1, m_videoInt, NULL);
+	SetDlgItemText(IDC_STATIC_FPS,"12fsp");
 }
 
 
@@ -430,6 +472,7 @@ void CSESDlg::OnBnClickedButtonFps25()
 	// TODO: 在此添加控件通知处理程序代码
 	m_videoInt= 40;    // ms
 	SetTimer(1, m_videoInt, NULL);
+	SetDlgItemText(IDC_STATIC_FPS,"25fsp");
 }
 
 
@@ -438,6 +481,7 @@ void CSESDlg::OnBnClickedButtonFps50()
 	// TODO: 在此添加控件通知处理程序代码
 	m_videoInt= 20;    // ms
 	SetTimer(1, m_videoInt, NULL);
+	SetDlgItemText(IDC_STATIC_FPS,"50fsp");
 }
 
 
@@ -446,4 +490,40 @@ void CSESDlg::OnBnClickedButtonFps100()
 	// TODO: 在此添加控件通知处理程序代码
 	m_videoInt= 10;    // ms
 	SetTimer(1, m_videoInt, NULL);
+	SetDlgItemText(IDC_STATIC_FPS,"100fsp");
+}
+
+
+void CSESDlg::OnBnClickedButtonTrack()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if (m_mat_gray.empty())
+	{
+		MessageBox("请先打开实时图或视频");
+		return;
+	}
+	if (m_DoTrack)
+	{
+		m_DoTrack= FALSE;
+		SetDlgItemText(IDC_BUTTON_TRACK,"景象匹配/目标跟踪");
+		return;
+	}
+	if (!tracker.m_GaborOK)
+	{
+		MessageBox("找不到 TURNHARDATA.HAR");
+	}
+	tracker.PT_IMGH= m_mat_gray.rows;
+	tracker.PT_IMGW= m_mat_gray.cols;
+	m_pnt.y= m_mat_gray.rows/2;
+	m_pnt.x= m_mat_gray.cols/2;
+	tracker.InitiateTrack((uchar*)(m_mat_gray.data), m_pnt);
+	m_DoTrack= TRUE;
+	SetDlgItemText(IDC_BUTTON_TRACK,"停止跟踪");
+	drawCross(&IplImage(m_mat1),m_pnt);
+	DrawMatToHDC(m_mat1, IDC_Showimg1);
+	char chEdit[8];
+	sprintf(chEdit,"%4d",(int)(m_pnt.x+0.5));
+	SetDlgItemText(IDC_EDIT_TARGET_X,chEdit);
+	sprintf(chEdit,"%4d",(int)(m_pnt.y+0.5));
+	SetDlgItemText(IDC_EDIT_TARGET_Y,chEdit);
 }

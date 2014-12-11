@@ -26,7 +26,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
     <UseOfMfc>Dynamic</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -101,15 +101,22 @@
     <None Include="res\SES.rc2" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BlockMatchDirSub.h" />
     <ClInclude Include="CvvImage.h" />
+    <ClInclude Include="FileProcess.h" />
+    <ClInclude Include="PTTrackLIB.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SES.h" />
     <ClInclude Include="SESDlg.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BlockMatchDirSub.cpp" />
     <ClCompile Include="CvvImage.cpp" />
+    <ClCompile Include="FileProcess.cpp" />
+    <ClCompile Include="PTTrackLIB.cpp" />
     <ClCompile Include="SES.cpp" />
     <ClCompile Include="SESDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
