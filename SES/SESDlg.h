@@ -21,7 +21,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV Ö§³Ö
 
 	cv::Mat m_mat1, m_mat_process, m_mat_gray;
-	cv::Mat m_mat_ref;
+	cv::Mat m_mat_ref, m_mat_ref_gray;
 	cv::VideoCapture m_cam;
 	void DrawMatToHDC(cv::Mat img, UINT ID);
 	void DrawPicToHDC(IplImage *img, UINT ID);
@@ -48,10 +48,8 @@ public:
 	afx_msg void OnBnClickedButtonFliph();
 	afx_msg void OnBnClickedButtonShoot();
 	afx_msg void OnBnClickedButtonHalt();
-	afx_msg void OnBnClickedButtonFps6();
-	afx_msg void OnBnClickedButtonFps12();
-	afx_msg void OnBnClickedButtonFps25();
-	afx_msg void OnBnClickedButtonFps50();
-	afx_msg void OnBnClickedButtonFps100();
 	afx_msg void OnBnClickedButtonTrack();
+	afx_msg void OnBnClickedButtonOpenseriesimg();
+	afx_msg void OnBnClickedButtonVideoSlow();
+	afx_msg void OnBnClickedButtonVideoFast();
 };

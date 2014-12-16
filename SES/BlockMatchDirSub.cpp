@@ -455,8 +455,8 @@ void CBlockMatchDirSub::Match2Layers(IplImage *imLarge, IplImage *imSmall, CvPoi
 			(int)(pointinlarge.y+i)*m_pLargeImg->widthStep+(int)(pointinlarge.x-nxr-srx),
 			nw+2*srx);
 	}
-	cvShowImage("im3",im3);
-	cvShowImage("im4",im4);
+	//cvShowImage("im3",im3);
+	//cvShowImage("im4",im4);
 	CvPoint2D32f pt2;		
 	SimpleMatch2D(im3,im4,&pt2);
 	pointInLarge->x= pointinlarge.x+pt2.x-srx;
