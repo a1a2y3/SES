@@ -412,7 +412,7 @@ void CBlockMatchDirSub::Match2Layers(IplImage *imLarge, IplImage *imSmall, CvPoi
 	cvResize(imLarge,im1);
 	cvResize(imSmall,im2);
 	InputImage(im1,im2);	
- 	GetSimMap_XY();
+	GetSimMap_XY();
 	SpaceSearchMatch_4d();
 	CvPoint2D32f pointinsmall,pointinlarge;
 	pointinsmall= cvPoint2D32f((im2->width-1)/2.0f,(im2->height-1)/2.0f);
@@ -436,9 +436,9 @@ void CBlockMatchDirSub::Match2Layers(IplImage *imLarge, IplImage *imSmall, CvPoi
 	pointinsmall.y= (float)(int)(pointinsmall.y+0.5);
 	pointinlarge.x= (float)(int)(pointinlarge.x+0.5);
 	pointinlarge.y= (float)(int)(pointinlarge.y+0.5);
-	rotateScaleImage(m_pSmallImg, m_Rot, m_Scl, &pointinsmall);
-	int nxr= int(m_pSmallImg->width*0.4);
-	int nyr= int(m_pSmallImg->height*0.4);
+	IplImage *pWarpImg=rotateScaleImage(m_pSmallImg, m_Rot, m_Scl, &pointinsmall);
+	int nxr= int(pWarpImg->width*0.4);
+	int nyr= int(pWarpImg->height*0.4);
 	int nw=2*nxr+1, nh=2*nyr+1;
 	int srx=int(scx*8+0.5), sry=int(scy*8+0.5);
 	IplImage *im3=cvCreateImage(cvSize(nw+srx*2, nh+sry*2),8,1);
@@ -446,8 +446,8 @@ void CBlockMatchDirSub::Match2Layers(IplImage *imLarge, IplImage *imSmall, CvPoi
 	int i,px=int(pointinsmall.x+0.5),py=int(pointinsmall.y+0.5);
 	for (i=-nyr;i<=nyr;i++)
 	{
-		memcpy(im4->imageData+(i+nyr)*im4->widthStep,m_pSmallImg->imageData+
-			(py+i)*m_pSmallImg->widthStep+px-nxr, nw);
+		memcpy(im4->imageData+(i+nyr)*im4->widthStep,pWarpImg->imageData+
+			(py+i)*pWarpImg->widthStep+px-nxr, nw);
 	}
 	for (i=-nyr-sry;i<=nyr+sry;i++)
 	{
@@ -455,8 +455,9 @@ void CBlockMatchDirSub::Match2Layers(IplImage *imLarge, IplImage *imSmall, CvPoi
 			(int)(pointinlarge.y+i)*m_pLargeImg->widthStep+(int)(pointinlarge.x-nxr-srx),
 			nw+2*srx);
 	}
-	//cvShowImage("im3",im3);
-	//cvShowImage("im4",im4);
+	cvReleaseImage(&pWarpImg);
+//	cvShowImage("im3",im3);
+//	cvShowImage("im4",im4);
 	CvPoint2D32f pt2;		
 	SimpleMatch2D(im3,im4,&pt2);
 	pointInLarge->x= pointinlarge.x+pt2.x-srx;

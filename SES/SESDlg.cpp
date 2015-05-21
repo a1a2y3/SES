@@ -8,14 +8,30 @@
 #include "afxdialogex.h"
 #include "BlockMatchDirSub.h"
 #include "PTTrackLIB.h"
+#include "TargetTrack.h"
+#include "TLD.h"
 #include "Timer.h"
 #include "FileProcess.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+#define _CAM_ID 0
+#define _TEST_MODE
+#define _MATCH_BMDS
+//  #define _TRACK_TLD
+  #define _TRACK_PT     // placetoken tracker
+//  #define _TRACK_MF     // median flow tracker
 using namespace cv;
-CBlockMatchDirSub bmds;
+
+#ifdef _TRACK_TLD
+TLD tracker;
+#endif
+#ifdef _TRACK_PT
 CPlaceTokenMatch tracker;
+#endif
+#ifdef _TRACK_MF
+CTargetTrack tracker;
+#endif
 CTimeCount tt;
 
 enum videoType {nocam,useCam, useVideo, useSeries};
@@ -29,7 +45,17 @@ CvPoint2D32f m_pnt= cvPoint2D32f(-1.0f,-1.0f);
 bool m_Flag1= FALSE;
 videoType m_videotype= nocam;
 CString m_SeriesName;
+int cnt=0;
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
+void DrawRect(cv::Mat im, int x, int y, int r, int lineW)
+{
+	rectangle(im, Point2i(x-r, y-r), Point2i(x+r,y+r), CV_RGB(0, 255, 0), lineW);
+}
+void DrawCross(cv::Mat im, int x, int y, int r, int lineW)
+{
+	line(im,Point2i(x-r,y),Point2i(x+r,y), CV_RGB(0, 255, 0), lineW);
+	line(im,Point2i(x,y-r),Point2i(x,y+r), CV_RGB(0, 255, 0), lineW);
+}
 
 class CAboutDlg : public CDialogEx
 {
@@ -90,6 +116,8 @@ BEGIN_MESSAGE_MAP(CSESDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_OPENSERIESIMG, &CSESDlg::OnBnClickedButtonOpenseriesimg)
 	ON_BN_CLICKED(IDC_BUTTON_VIDEO_SLOW, &CSESDlg::OnBnClickedButtonVideoSlow)
 	ON_BN_CLICKED(IDC_BUTTON_VIDEO_FAST, &CSESDlg::OnBnClickedButtonVideoFast)
+	ON_BN_CLICKED(IDC_BUTTON_SAVEREF, &CSESDlg::OnBnClickedButtonSaveref)
+	ON_BN_CLICKED(IDC_BUTTON_TEST_TRACK, &CSESDlg::OnBnClickedButtonTestTrack)
 END_MESSAGE_MAP()
 
 
@@ -168,10 +196,10 @@ void CSESDlg::OnPaint()
 	else
 	{
 		// 显示图像
-		if (m_mat1.data)
-			DrawMatToHDC(m_mat1, IDC_Showimg1);
-		if (m_mat_ref.data)
-			DrawMatToHDC(m_mat_ref, IDC_ShowImg2);
+		if (!m_mat1_display.empty())
+			DrawMatToHDC(m_mat1_display, IDC_Showimg1);
+		if (!m_mat_ref_display.empty())
+			DrawMatToHDC(m_mat_ref_display, IDC_ShowImg2);
 		CDialogEx::OnPaint();
 	}
 }
@@ -210,7 +238,7 @@ void CSESDlg::DrawMatToHDC(cv::Mat img, UINT ID)//------对应新版Mat 的显示函数
 void CSESDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
-if (m_videotype== useCam || m_videotype== useVideo)
+	if (m_videotype== useCam || m_videotype== useVideo)
 	{
 		m_cam>>m_mat1;
 		if( !m_mat1.data )                                    // 判断是否成功载入图片
@@ -227,31 +255,26 @@ if (m_videotype== useCam || m_videotype== useVideo)
 	{
 		return;       // nocam
 	}
-	m_mat_process= m_mat1.clone();
-	// 添加视频处理代码
-	// 实时预处理并输出，左右翻转
-	if (m_flipH)
-	{
-		cv::flip(m_mat_process,m_mat_process,1);
-	}
-	m_mat1.release();
-	m_mat1= m_mat_process.clone();
-	// 灰度图像处理，只输出坐标
-//	m_mat_gray.create(m_mat_process.rows,m_mat_process.cols,CV_8UC1);
-	if (m_mat_process.channels()==3)
-	{
-		cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
-	}
+	if( m_mat1.empty())                                    // 判断是否成功载入图片
+		return;
+	if (m_flipH)     cv::flip(m_mat1,m_mat1,1);
+	m_mat1_display= m_mat1.clone();
+	if (m_mat1.channels()==3)
+		cvtColor(m_mat1,m_mat_gray,CV_RGB2GRAY);
 	else
-	{
-		m_mat_gray= m_mat_process.clone();
-	}
+		m_mat_gray= m_mat1.clone();
 	IplImage *im= &IplImage(m_mat_gray);
 	if (m_DoTrack)
-	{		
+	{	
+#ifdef _TEST_MODE
+		cnt++;
+		char fileName[25];
+		sprintf(fileName,"D:\\data\\result\\%05d.jpg",cnt);
+		imwrite(fileName,m_mat1);
+#endif
 		tt.Start();
-		tracker.TrackOneImage((uchar*)(m_mat_gray.data),  m_pnt);
-		drawCross(&IplImage(m_mat1),m_pnt);
+		tracker.TrackOneImage(&(IplImage)(m_mat_gray),  &m_pnt);
+		DrawCross(m_mat1_display,int(m_pnt.x+0.5),int(m_pnt.y+0.5),25,2);
 		tt.End();
 		char chEdit[8];
 		sprintf(chEdit,"%4d",(int)(m_pnt.x+0.5));
@@ -261,8 +284,16 @@ if (m_videotype== useCam || m_videotype== useVideo)
 		sprintf(chEdit,"%7.1f",tt.GetUseTime());
 		SetDlgItemText(IDC_EDIT_USED_TIME,chEdit);
 	}
+	else 
+	{
+		if(m_videotype== useCam)
+		{
+			DrawCross(m_mat1_display,m_mat1_display.cols/2,m_mat1_display.rows/2,25,1);
+			DrawRect(m_mat1_display,m_mat1_display.cols/2,m_mat1_display.rows/2,50,2);
+		}
+	}
 	// 显示
-	DrawMatToHDC(m_mat1, IDC_Showimg1);
+	DrawMatToHDC(m_mat1_display, IDC_Showimg1);
 	//m_frame=cvQueryFrame(m_capture);
 	//DrawPicToHDC(m_frame,IDC_Showimg1);
 	//cvFlip(m_frame,m_frame,1);
@@ -277,7 +308,7 @@ void CSESDlg::OnBnClickedButtonOpencarema()
 	{
 		m_cam.release();
 	}
-	if (!(m_cam.open(1)))
+	if (!(m_cam.open(_CAM_ID)))
 	{
 		MessageBox("无法打开摄像头");
 	}
@@ -286,28 +317,28 @@ void CSESDlg::OnBnClickedButtonOpencarema()
 		m_videotype= useCam;
 		// 显示图像参数
 		m_cam>>m_mat1;
-		m_mat_process= m_mat1.clone();
-		if (m_flipH)
-		{
-			cv::flip(m_mat_process,m_mat_process,1);
-		}
-		m_mat1.release();
-		m_mat1= m_mat_process.clone();
-		if (m_mat_process.channels()==3)
-		{
-			cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
-		}
+		if( m_mat1.empty())                                    // 判断是否成功载入图片
+			return;
+		if (m_flipH)     cv::flip(m_mat1,m_mat1,1);
+		m_mat1_display= m_mat1.clone();
+		// draw mask
+		DrawCross(m_mat1_display,m_mat1_display.cols/2,m_mat1_display.rows/2,25,1);
+		DrawRect(m_mat1_display,m_mat1_display.cols/2,m_mat1_display.rows/2,50,2);
+		// convert color to gray
+		if (m_mat1.channels()==3)
+			cvtColor(m_mat1,m_mat_gray,CV_RGB2GRAY);
 		else
-		{
-			m_mat_gray= m_mat_process.clone();
-		}
+			m_mat_gray= m_mat1.clone();
 		char chEdit[10];
 		_itoa_s(m_mat1.cols,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realw,chEdit);
 		_itoa_s(m_mat1.rows,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realh,chEdit);
-		DrawMatToHDC( m_mat1, IDC_Showimg1 ); 
+		DrawMatToHDC( m_mat1_display, IDC_Showimg1 ); 
 		// 设置定时器
+		m_FPS= 25;
+		sprintf(chEdit,"%4d",m_FPS);
+		SetDlgItemText(IDC_STATIC_FPS,chEdit);
 		SetTimer(1, int(1000/(m_FPS+0.00001)+0.5), NULL);
 	}
 }
@@ -346,7 +377,8 @@ void CSESDlg::OnBnClickedButtonOpenreal()
 	m_mat1 = cv::imread( LPCSTR(mPath), 1 );    // 读取图片、缓存到一个局部变量 ipl 中
 	if( !m_mat1.data )                                    // 判断是否成功载入图片
 		return;	
-	DrawMatToHDC( m_mat1, IDC_Showimg1 );            // 调用显示图片函数 
+	m_mat1_display= m_mat1.clone();
+	DrawMatToHDC( m_mat1_display, IDC_Showimg1 );            // 调用显示图片函数 
 	// 显示图像参数
 	char chEdit[10];
 	_itoa_s(m_mat1.cols,chEdit,10);
@@ -375,6 +407,7 @@ void CSESDlg::OnBnClickedButtonOpenref()
 		MessageBox("打开图像出错！");
 		return;	
 	}
+	m_mat_ref_display= m_mat_ref.clone();
 	if (m_mat_ref.channels()==3)
 	{
 		cvtColor(m_mat_ref,m_mat_ref_gray,CV_RGB2GRAY);
@@ -385,9 +418,9 @@ void CSESDlg::OnBnClickedButtonOpenref()
 	}
 	
 	CvPoint2D32f drawpoint= cvPoint2D32f((m_mat_ref_gray.cols-1)/2.0f,(m_mat_ref_gray.rows-1)/2.0f);
-	drawCross(&IplImage(m_mat_ref),drawpoint);
+	drawCross(&IplImage(m_mat_ref_display),drawpoint);
 	imshow("基准图",m_mat_ref);
-	DrawMatToHDC( m_mat_ref, IDC_ShowImg2 );            // 调用显示图片函数 
+	DrawMatToHDC( m_mat_ref_display, IDC_ShowImg2 );            // 调用显示图片函数 
 	// 显示图像参数
 	char chEdit[10];
 	_itoa_s(m_mat_ref.cols,chEdit,10);
@@ -424,29 +457,25 @@ void CSESDlg::OnBnClickedButtonOpenavi()
 		m_videotype= useVideo;
 		// 显示图像参数
 		m_cam>>m_mat1;
-		m_mat_process= m_mat1.clone();
-		if (m_flipH)
-		{
-			cv::flip(m_mat_process,m_mat_process,1);
-		}
-		m_mat1.release();
-		m_mat1= m_mat_process.clone();
-		if (m_mat_process.channels()==3)
-		{
-			cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
-		}
+		if( m_mat1.empty())                                    // 判断是否成功载入图片
+			return;
+		if (m_flipH)     cv::flip(m_mat1,m_mat1,1);
+		m_mat1_display= m_mat1.clone();
+		if (m_mat1.channels()==3)
+			cvtColor(m_mat1,m_mat_gray,CV_RGB2GRAY);
 		else
-		{
-			m_mat_gray= m_mat_process.clone();
-		}
+			m_mat_gray= m_mat1.clone();
 		char chEdit[10];
 		_itoa_s(m_mat1.cols,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realw,chEdit);
 		_itoa_s(m_mat1.rows,chEdit,10);
 		SetDlgItemText(IDC_EDIT_Realh,chEdit);
 		// 刷新显示区
-		DrawMatToHDC( m_mat1, IDC_Showimg1 ); 
+		DrawMatToHDC( m_mat1_display, IDC_Showimg1 ); 
 		// 设置定时器
+		m_FPS= 0;
+		sprintf(chEdit,"%4d",m_FPS);
+		SetDlgItemText(IDC_STATIC_FPS,chEdit);
 		SetTimer(1, int(1000/(m_FPS+0.00001)+0.5), NULL);
 	}
 }
@@ -471,24 +500,15 @@ void CSESDlg::OnBnClickedButtonOpenseriesimg()
 
 	m_SeriesName = dlg.GetPathName();            // 获取图片路径
 	m_mat1 = cv::imread( LPCSTR(m_SeriesName), 1 );    // 读取图片、缓存到一个局部变量 ipl 中
-	if( !m_mat1.data )                                    // 判断是否成功载入图片
+	if( m_mat1.empty())                                    // 判断是否成功载入图片
 		return;
-	m_mat_process= m_mat1.clone();
-	if (m_flipH)
-	{
-		cv::flip(m_mat_process,m_mat_process,1);
-	}
-	m_mat1.release();
-	m_mat1= m_mat_process.clone();
-	if (m_mat_process.channels()==3)
-	{
-		cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
-	}
+	if (m_flipH)     cv::flip(m_mat1,m_mat1,1);
+	m_mat1_display= m_mat1.clone();
+	if (m_mat1.channels()==3)
+		cvtColor(m_mat1,m_mat_gray,CV_RGB2GRAY);
 	else
-	{
-		m_mat_gray= m_mat_process.clone();
-	}
-	DrawMatToHDC( m_mat1, IDC_Showimg1 );            // 调用显示图片函数 
+		m_mat_gray= m_mat1.clone();
+	DrawMatToHDC( m_mat1_display, IDC_Showimg1 );            // 调用显示图片函数 
 	m_videotype= useSeries;
 	// 显示图像参数
 	char chEdit[10];
@@ -496,6 +516,9 @@ void CSESDlg::OnBnClickedButtonOpenseriesimg()
 	SetDlgItemText(IDC_EDIT_Realw,chEdit);
 	_itoa_s(m_mat1.rows,chEdit,10);
 	SetDlgItemText(IDC_EDIT_Realh,chEdit);
+	m_FPS= 0;
+	sprintf(chEdit,"%4d",m_FPS);
+	SetDlgItemText(IDC_STATIC_FPS,chEdit);
 	SetTimer(1, int(1000/(m_FPS+0.00001)+0.5), NULL);
 }
 
@@ -510,25 +533,10 @@ void CSESDlg::OnBnClickedButtonFliph()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	m_flipH= !m_flipH;
-	if (m_mat1.empty())
-	{
-		return;
-	}
-	m_mat_process= m_mat1.clone();
-	cv::flip(m_mat_process,m_mat_process,1);
-	m_mat1.release();
-	m_mat1= m_mat_process.clone();
-	// 灰度图像处理，只输出坐标
-	//	m_mat_gray.create(m_mat_process.rows,m_mat_process.cols,CV_8UC1);
-	if (m_mat_process.channels()==3)
-	{
-		cvtColor(m_mat_process,m_mat_gray,CV_RGB2GRAY);
-	}
-	else
-	{
-		m_mat_gray= m_mat_process.clone();
-	}
-	DrawMatToHDC(m_mat1, IDC_Showimg1);
+	if (!m_mat1.empty()) cv::flip(m_mat1,m_mat1,1);
+	m_mat1_display= m_mat1.clone();
+	if (!m_mat_gray.empty()) cv::flip(m_mat_gray,m_mat_gray,1);
+	DrawMatToHDC(m_mat1_display, IDC_Showimg1);
 }
 
 
@@ -541,9 +549,9 @@ void CSESDlg::OnBnClickedButtonShoot()
 	}
 	CFileDialog dlg(FALSE, _T("*.BMP"), NULL,
 		OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
-		NULL, NULL);                                        // 选项图片的约定
+		_T("*.BMP"), NULL);                                        // 选项图片的约定
 	dlg.m_ofn.lpstrTitle = _T("视频截图");    // 打开文件对话框的标题名
-	//	dlg.m_ofn.lpstrFilter=_T("image files (*.jpg) \0*.jpg\0image files (*.bmp)\0*.bmp\0All Files (*.*) \0*.*");
+	dlg.m_ofn.lpstrFilter=_T("image files (*.bmp) \0*.bmp\0image files (*.jpg)\0*.jpg\0All Files (*.*) \0*.*");
 	if( dlg.DoModal() != IDOK )                    // 判断是否获得图片
 		return;
 
@@ -600,6 +608,11 @@ void CSESDlg::OnBnClickedButtonVideoFast()
 void CSESDlg::OnBnClickedButtonTrack()
 {
 	// TODO: 在此添加控件通知处理程序代码
+	if (m_mat_ref_gray.empty())
+	{
+		MessageBox("请先打开基准图或视频");
+		return;
+	}
 	if (m_mat_gray.empty())
 	{
 		MessageBox("请先打开实时图或视频");
@@ -613,22 +626,112 @@ void CSESDlg::OnBnClickedButtonTrack()
 	}
 	// 匹配
 	tt.Start();
+	CBlockMatchDirSub bmds;
 	bmds.Match2Layers(&IplImage(m_mat_gray),&IplImage(m_mat_ref_gray),&m_pnt);
 	tt.End();	
 	// 跟踪
+#ifdef _TRACK_PT
 	if (!tracker.m_GaborOK)
 	{
 		MessageBox("找不到 TURNHARDATA.HAR");
 	}
 	tracker.PT_IMGH= m_mat_gray.rows;
 	tracker.PT_IMGW= m_mat_gray.cols;
+#endif
 	//m_pnt.y= m_mat_gray.rows/2;
 	//m_pnt.x= m_mat_gray.cols/2;
-	tracker.InitiateTrack((uchar*)(m_mat_gray.data), m_pnt);
+	tracker.InitiateTrack(&(IplImage)(m_mat_gray), m_pnt);
 	m_DoTrack= TRUE;
 	SetDlgItemText(IDC_BUTTON_TRACK,"停止跟踪");
-	drawCross(&IplImage(m_mat1),m_pnt);
-	DrawMatToHDC(m_mat1, IDC_Showimg1);
+	drawCross(&IplImage(m_mat1_display),m_pnt);
+	DrawMatToHDC(m_mat1_display, IDC_Showimg1);
+	char chEdit[8];
+	sprintf(chEdit,"%4d",(int)(m_pnt.x+0.5));
+	SetDlgItemText(IDC_EDIT_TARGET_X,chEdit);
+	sprintf(chEdit,"%4d",(int)(m_pnt.y+0.5));
+	SetDlgItemText(IDC_EDIT_TARGET_Y,chEdit);
+
+	sprintf(chEdit,"%7.1f",tt.GetUseTime());
+	SetDlgItemText(IDC_EDIT_USED_TIME,chEdit);
+}
+
+void CSESDlg::OnBnClickedButtonSaveref()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if (m_mat1.empty())
+	{
+		return;
+	}
+	m_mat_ref.create(m_mat1.rows/2,m_mat1.rows/2,m_mat1.type());
+	m_mat1(Rect(m_mat1.cols/4, m_mat1.rows/4, m_mat1.rows/2, m_mat1.rows/2)).copyTo(m_mat_ref);
+	m_mat_ref_display= m_mat_ref.clone();
+	// 显示
+	if (m_mat_ref.channels()==3)
+	{
+		cvtColor(m_mat_ref,m_mat_ref_gray,CV_RGB2GRAY);
+	}
+	else
+	{
+		m_mat_ref_gray= m_mat_ref.clone();
+	}
+	CvPoint2D32f drawpoint= cvPoint2D32f((m_mat_ref_gray.cols-1)/2.0f,(m_mat_ref_gray.rows-1)/2.0f);
+	drawCross(&IplImage(m_mat_ref_display),drawpoint);
+	imshow("基准图",m_mat_ref);
+	DrawMatToHDC( m_mat_ref_display, IDC_ShowImg2 );            // 调用显示图片函数 
+	// 显示图像参数
+	char chEdit[10];
+	_itoa_s(m_mat_ref.cols,chEdit,10);
+	SetDlgItemText(IDC_EDIT_Refw,chEdit);
+	_itoa_s(m_mat_ref.rows,chEdit,10);
+	SetDlgItemText(IDC_EDIT_Refh,chEdit);
+	// 保存基准图
+	CFileDialog dlg(FALSE, _T("*.BMP"), NULL,
+		OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
+		_T("*.BMP"), NULL);                                        // 选项图片的约定
+	dlg.m_ofn.lpstrTitle = _T("保存基准图");    // 打开文件对话框的标题名
+	dlg.m_ofn.lpstrFilter=_T("image files (*.bmp) \0*.bmp\0image files (*.jpg)\0*.jpg\0All Files (*.*) \0*.*");
+	if( dlg.DoModal() != IDOK )                    // 判断是否获得图片
+		return;
+	CString mPath = dlg.GetPathName();            // 获取图片路径
+	cv::imwrite(LPCSTR(mPath),m_mat_ref);
+}
+
+
+void CSESDlg::OnBnClickedButtonTestTrack()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if (m_mat_gray.empty())
+	{
+		MessageBox("请先打开实时图或视频");
+		return;
+	}
+	if (m_DoTrack)
+	{
+		m_DoTrack= FALSE;
+		SetDlgItemText(IDC_BUTTON_TEST_TRACK,"跟踪算法测试");
+		return;
+	}
+	// 跟踪
+#ifdef _TRACK_PT
+	if (!tracker.m_GaborOK)
+	{
+		MessageBox("找不到 TURNHARDATA.HAR");
+	}
+
+	tracker.PT_IMGH= m_mat_gray.rows;
+	tracker.PT_IMGW= m_mat_gray.cols;
+#endif	
+	m_pnt.y= m_mat_gray.rows/2;
+	m_pnt.x= m_mat_gray.cols/2;
+//	TLD *ptracker= new TLD;
+	tracker.InitiateTrack(&(IplImage)(m_mat_gray), m_pnt);
+	cnt= 0;
+	m_DoTrack= TRUE;
+	SetDlgItemText(IDC_BUTTON_TEST_TRACK,"停止跟踪");
+	drawCross(&IplImage(m_mat1_display),m_pnt);
+	imshow("跟踪算法测试",m_mat1_display);
+	DrawMatToHDC(m_mat1_display, IDC_Showimg1);
+
 	char chEdit[8];
 	sprintf(chEdit,"%4d",(int)(m_pnt.x+0.5));
 	SetDlgItemText(IDC_EDIT_TARGET_X,chEdit);

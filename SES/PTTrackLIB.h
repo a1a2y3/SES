@@ -73,10 +73,9 @@ class CPlaceTokenMatch
 {
 public:
 	CPlaceTokenMatch();
-	void        InitiateTrack(BYTE *pInImg, CFPt2D  TargetPos);
-	void        InitiateTrack(cv::Mat matIm, CFPt2D  TargetPos);
-	bool        TrackOneImage(BYTE *pInImg, CFPt2D &TargetPos);
-	bool        TrackOneImage(cv::Mat matIm, CFPt2D &TargetPos);
+	void        InitiateTrack(IplImage *im, CFPt2D  TargetPos);
+//	bool        TrackOneImage(BYTE *pInImg, CFPt2D &TargetPos);
+	bool        TrackOneImage(IplImage *im, CFPt2D *TargetPos);
 	void        GetToken(short  *pInMask, double *pToken);
 	void        ResetCoeff0(BYTE *pInImg, int x0, int y0);
 

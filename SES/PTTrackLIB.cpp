@@ -84,23 +84,14 @@ CPlaceTokenMatch::CPlaceTokenMatch()
 //
 //
 //***********************************************************************
-void  CPlaceTokenMatch::InitiateTrack(BYTE *pInImage,    //输入图像指针
+void  CPlaceTokenMatch::InitiateTrack(IplImage *im,    //输入图像指针
 							  	      CFPt2D  TargetPos)          //目标个数
 {
+	BYTE *pInImage= (BYTE*)im->imageData;
 	m_Target.Pos = TargetPos;
 	m_Target.Rat = cvPoint2D32f(0, 0);
  	m_UpdateNum  = 0;
 
-	Get_CImage_Rect(pTMask1, pInImage, int(TargetPos.x + 0.5), int(TargetPos.y + 0.5), 2);
-	ResetCoeff0(pInImage, int(TargetPos.x), int(TargetPos.y));
-}
-void  CPlaceTokenMatch::InitiateTrack(cv::Mat matIm,    //输入图像指针
-	CFPt2D  TargetPos)          //目标个数
-{
-	m_Target.Pos = TargetPos;
-	m_Target.Rat = cvPoint2D32f(0, 0);
-	m_UpdateNum  = 0;
-	BYTE *pInImage= matIm.data;
 	Get_CImage_Rect(pTMask1, pInImage, int(TargetPos.x + 0.5), int(TargetPos.y + 0.5), 2);
 	ResetCoeff0(pInImage, int(TargetPos.x), int(TargetPos.y));
 }
@@ -185,9 +176,10 @@ void   MaskMinus(short* Mask0, short* Mask1, int datanum)
 //
 //
 //*************************************************************************
-bool  CPlaceTokenMatch::TrackOneImage(BYTE *pInImage,    //输入图像指针
-									  CFPt2D &TargetPos)  //存储获得的目标位置
+bool  CPlaceTokenMatch::TrackOneImage(IplImage *im,    //输入图像指针
+									  CFPt2D *TargetPos)  //存储获得的目标位置
 {
+	BYTE *pInImage= (BYTE*)im->imageData;
 	CFPt2D    CalcPos;
     int x0, y0, j;
 	float     Men1 = 0;
@@ -229,14 +221,14 @@ bool  CPlaceTokenMatch::TrackOneImage(BYTE *pInImage,    //输入图像指针
 // 	MaxCor = NormCor(pCurMASK, pTMask1, Men1, Sig1, PT_DL0>>1);
 
 	MaxCor = GetCoe(pCurMASK, pTMask1, PT_MASKD, PT_MASKD);
-	if((PreCor - MaxCor) < 0.38 || Unstable> 1)
+	if((PreCor - MaxCor) < 0.1 || Unstable> 1)
 	{
 		Get_CImage_Rect(pTMask1, pInImage, x0, y0, 2);
 		Unstable = 0;
 		PreCor = MaxCor;
 		m_Target.UpdateSelf(CalcPos);
 		m_UpdateNum++;	
-		TargetPos = CalcPos;
+		*TargetPos = CalcPos;
 		ResetCoeff0(pInImage, x0, y0);
 	}
 	else if((PreCor - MaxCor)> 0.38)

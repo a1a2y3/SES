@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="TLD">
+      <UniqueIdentifier>{80c16b2e-1f59-4ef9-849f-bcb336832ba5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
@@ -21,6 +24,9 @@
     </None>
     <None Include="res\SES.ico">
       <Filter>资源文件</Filter>
+    </None>
+    <None Include="parameters.yml">
+      <Filter>TLD</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -54,6 +60,24 @@
     <ClInclude Include="FileProcess.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="DisplayFuncs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="TargetTrack.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="FerNNClassifier.h">
+      <Filter>TLD</Filter>
+    </ClInclude>
+    <ClInclude Include="LKTracker.h">
+      <Filter>TLD</Filter>
+    </ClInclude>
+    <ClInclude Include="TLD.h">
+      <Filter>TLD</Filter>
+    </ClInclude>
+    <ClInclude Include="tld_utils.h">
+      <Filter>TLD</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SES.cpp">
@@ -76,6 +100,24 @@
     </ClCompile>
     <ClCompile Include="FileProcess.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="DisplayFuncs.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="TargetTrack.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="FerNNClassifier.cpp">
+      <Filter>TLD</Filter>
+    </ClCompile>
+    <ClCompile Include="LKTracker.cpp">
+      <Filter>TLD</Filter>
+    </ClCompile>
+    <ClCompile Include="TLD.cpp">
+      <Filter>TLD</Filter>
+    </ClCompile>
+    <ClCompile Include="tld_utils.cpp">
+      <Filter>TLD</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
